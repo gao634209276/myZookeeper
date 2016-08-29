@@ -1,4 +1,4 @@
-package com.study.zookeeper;
+package zookeeper;
 
 import java.io.IOException;
 
