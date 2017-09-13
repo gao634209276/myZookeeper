@@ -1,0 +1,19 @@
+Curator参数说明
+	1.connectString zookeeper服务器的连接
+	2.retryPolicy 重试策略，默认有四个ExponentialBackoffRetry、RetryNtime、Retryonetime、RetryUtilElapsed
+	3.sessionTimeoutMs 回话超时时间，默认60 000ms
+	4.connectionTimeoutMs 连接创建超时时间， 默认15 000ms
+RetryPolicy
+	1.retryCount 已经重试的次数，如果是第一次，那么改值为0
+	2.elapsedTimeMs 从第一次尝试开始已经花费的时间
+	3.Sleepeer 用于sleep指定时间。不建议使用Thread.sleep()操作
+ExponentialBackoffRetry
+	1.baseSleepTimeMs 初始sleep时间
+	2.maxRetries 最大重试次数
+	3.maxSleepMs 最大sleep时间
+典型场景使用
+1.事件监听 简化原生zookeeper api反复注册监听
+	NodeCache --监控当前节点数据变化
+	1.client 客户端实例
+	2.path 数据节点的路径
+	3.dataIsCompressed 是否进行数据压缩
