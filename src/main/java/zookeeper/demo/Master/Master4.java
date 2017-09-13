@@ -1,29 +1,28 @@
-package zookeeper.Demo.Master;
+package zookeeper.demo.Master;
 
 import java.io.IOException;
 import java.util.Random;
 
-import org.apache.zookeeper.AsyncCallback.StatCallback;
+import org.apache.zookeeper.AsyncCallback.DataCallback;
+import org.apache.zookeeper.AsyncCallback.StringCallback;
 import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException.Code;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
-import org.apache.zookeeper.AsyncCallback.DataCallback;
-import org.apache.zookeeper.AsyncCallback.StringCallback;
-import org.apache.zookeeper.KeeperException.Code;
-import org.apache.zookeeper.Watcher.Event.EventType;
 import org.apache.zookeeper.ZooDefs.Ids;
-import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.Stat;
+import org.apache.zookeeper.ZooKeeper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class Master5 implements Watcher {
-	private static final Logger LOG = LoggerFactory.getLogger(Master5.class);
-	static ZooKeeper zk;
-	public String hostPort;
+public class Master4 implements Watcher {
+	private static final Logger LOG = LoggerFactory.getLogger(Master4.class);
+	ZooKeeper zk;
+	String hostPort;
+	String serverId = Integer.toHexString(new Random().nextInt());
 
-	Master5(String hostPort) {
+	public Master4(String hostPort) {
 		this.hostPort = hostPort;
 	}
 
@@ -31,16 +30,21 @@ public class Master5 implements Watcher {
 		zk = new ZooKeeper(hostPort, 15000, this);
 	}
 
+	@Override
+	public void process(WatchedEvent event) {
+		LOG.info(event.toString() + ", " + hostPort);
+	}
+
 	void stopZK() throws InterruptedException {
 		zk.close();
 	}
 
-	String serverId = Integer.toHexString(new Random().nextInt());
-	boolean isLeader = false;
+	// *****************************************************************//
+	// Master
+	// *****************************************************************//
+
 	// StringCallback有服务端回调,客户端执行
 	StringCallback masterCreateCallback = new StringCallback() {
-		MasterStates state;
-
 		// processResult对rc进行解析,分类处理
 		@Override
 		public void processResult(int rc, String path, Object ctx, String name) {
@@ -51,69 +55,21 @@ public class Master5 implements Watcher {
 				break;
 			// 返回OK-->是Leader
 			case OK:
-				state = MasterStates.ELECTED;
-				takeLeadership();
+				isLeader = true;
 				break;
 			// 其他-->不是Leader
-			case NODEEXISTS:
-				state = MasterStates.NOTELECTED;
-				masterExists();
-				break;
 			default:
-				state = MasterStates.NOTELECTED;
-				LOG.error("Something went wrong when running for master.",
-						KeeperException.create(Code.get(rc), path));
+				isLeader = false;
+				break;
 			}
 			System.out.println("I am " + (isLeader ? "" : "not ")
 					+ "the leader");
 		}
 
 	};
-	MasterStates state;
-	StatCallback masterExistsCallback = new StatCallback() {
-
-		@Override
-		public void processResult(int rc, String path, Object ctx, Stat stat) {
-			switch (Code.get(rc)) {
-			case CONNECTIONLOSS:
-				masterExists();
-				break;
-			case OK:
-				if (stat == null) {
-					state = MasterStates.RUNNING;
-					runForMaster();
-				}
-				break;
-			default:
-				checkMaster();
-				break;
-			}
-		}
-	};
-
-	void masterExists() {
-		zk.exists("/master", masterExistsWatcher, masterExistsCallback, null);
-
-	}
-
-	void takeLeadership() {
-
-	}
-
-	Watcher masterExistsWatcher = new Watcher() {
-
-		@Override
-		public void process(WatchedEvent event) {
-			if (event.getType() == EventType.NodeDeleted) {
-				assert "/master".equals(event.getPath());
-				runForMaster();
-			}
-		}
-
-	};
-
 	// DataCallback与StringCallback类似,只是用于getData中
 	DataCallback masterCheckCallBack = new DataCallback() {
+		@SuppressWarnings("incomplete-switch")
 		@Override
 		public void processResult(int rc, String path, Object ctx, byte[] data,
 				Stat stat) {
@@ -125,9 +81,6 @@ public class Master5 implements Watcher {
 				// 如果是没有Leader,执行注册
 			case NONODE:
 				runForMaster();
-				return;
-				// 其他-->..
-			default:
 				return;
 			}
 		}
@@ -147,14 +100,48 @@ public class Master5 implements Watcher {
 	}
 
 	public static void main(String[] args) throws InterruptedException {
-		Master5 m = new Master5("127.0.0.1:2137");
+		Master3 m = new Master3("127.0.0.1:2137");
 		// 完成create操作的Client是Master
 		m.runForMaster();
 		m.stopZK();
 	}
 
-	@Override
-	public void process(WatchedEvent event) {
-		System.out.println(event);
+	// ******************************************************************//
+	// Data
+	boolean isLeader = false;
+	StringCallback createParentCallback = new StringCallback() {
+
+		@Override
+		public void processResult(int rc, String path, Object ctx, String name) {
+			switch (Code.get(rc)) {
+			case CONNECTIONLOSS:
+				createParent(path, (byte[]) ctx);
+				break;
+			case OK:
+				LOG.info("Parent created");
+				break;
+			case NODEEXISTS:
+				LOG.warn("Parent alread registered: " + path);
+				break;
+			default:
+				LOG.error("Something went wrong: "
+						+ KeeperException.create(Code.get(rc), path));
+				break;
+			}
+		}
+	};
+
+	void createParent(String path, byte[] data) {
+		zk.create(path, data, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT,
+				createParentCallback, data);
+
 	}
+
+	public void bootstrap() {
+		createParent("/workers", new byte[0]);
+		createParent("/assign", new byte[0]);
+		createParent("/tasks", new byte[0]);
+		createParent("/status", new byte[0]);
+	}
+
 }

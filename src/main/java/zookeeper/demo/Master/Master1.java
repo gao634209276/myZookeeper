@@ -1,4 +1,4 @@
-package zookeeper.Demo.Master;
+package zookeeper.demo.Master;
 
 import java.io.IOException;
 

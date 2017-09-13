@@ -1,4 +1,4 @@
-package zookeeper.Demo;
+package zookeeper.demo;
 
 import org.apache.zookeeper.AsyncCallback.DataCallback;
 import org.apache.zookeeper.KeeperException.Code;

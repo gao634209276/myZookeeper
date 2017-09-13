@@ -1,4 +1,4 @@
-package zookeeper.Demo.Client;
+package zookeeper.demo.Client;
 
 import java.io.IOException;
 import java.util.Date;

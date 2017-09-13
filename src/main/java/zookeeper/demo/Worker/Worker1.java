@@ -1,4 +1,4 @@
-package zookeeper.Demo.Worker;
+package zookeeper.demo.Worker;
 
 import java.io.IOException;
 import java.util.Random;
